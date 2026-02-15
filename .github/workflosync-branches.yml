@@ -1,0 +1,39 @@
+yaml
+  
+name: Sync Branches from Upstream
+
+on:
+  workflow_dispatch:  # 允许手动触发
+  schedule:
+    - cron: '0 */6 * * *'  # 每 6 小时自动同步一次
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 拉取所有历史
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/SteamAutoCracks/ManifestHub.git
+
+      - name: Fetch upstream
+        run: git fetch upstream
+
+      - name: Sync all branches
+        run: |
+          # 同步所有现有分支的更新
+          for branch in $(git branch -r | grep -v '\->' | sed 's/upstream\///'); do
+            if git show-ref --verify --quiet refs/heads/$branch; then
+              # 如果本地分支已存在，拉取更新并推送
+              git checkout $branch
+              git pull upstream $branch
+              git push origin $branch
+            else
+              # 如果本地分支不存在，从上游创建并推送
+              git checkout -b $branch upstream/$branch
+              git push origin $branch
+            fi
+          done
